@@ -4,8 +4,8 @@
 #   Program:    backup
 #   File:       backup.pl
 #   
-#   Version:    V1.2
-#   Date:       20.08.16
+#   Version:    V1.3
+#   Date:       30.08.16
 #   Function:   Flexible backup script
 #   
 #   Copyright:  (c) Dr. Andrew C. R. Martin, UCL, 2016
@@ -53,6 +53,7 @@
 #   V1.0   12.08.16  Original   By: ACRM
 #   V1.1   14.06.16  Added -delete and -nodelete options
 #   V1.2   20.06.16  Added -c option
+#   V1.3   30.08.16  Improved help
 #
 #*************************************************************************
 # Add the path of the executable to the library path
@@ -66,7 +67,7 @@ use lib $FindBin::Bin;
 use strict;
 
 # Usage message
-UsageDie() if(defined($::h));
+UsageDie($::h) if(defined($::h));
 
 # Constants
 use constant QUIET       => 0;
@@ -121,15 +122,21 @@ else
 # Prints a usage message
 #
 # 12.08.16  Original   By: ACRM
+# 30.08.16  Added example parameter
 sub UsageDie
 {
-    print <<__EOF;
+    my($example) = @_;
 
-Backup V1.2 (c) 2016 Dr. Andrew C.R. Martin, UCL
+    if($example eq '1')
+    {
+        print <<__EOF;
 
-Usage: backup [-h][-n][-nr][-q][-v][-create][-init][-c]
+Backup V1.3 (c) 2016 Dr. Andrew C.R. Martin, UCL
+
+Usage: backup [-h[=config]][-n][-nr][-q][-v][-create][-init][-c]
               [-nodelete][-delete]     [backup.conf]
        -h        This help message
+       -h=config Give details of config file
        -n        Pretend to do the backup
        -nr       Make rsync pretend to do the backup
        -q        Run quietly
@@ -178,6 +185,12 @@ NOTE! rsync must be installed and in your path. pg_dumpall from the
 PostgreSQL package must be available in your path if you wish to
 backup databases.
 
+__EOF
+    }
+    else
+    {
+        print <<'__EOF';
+    
 Example config file...
 
 # Set global excludes
@@ -185,20 +198,22 @@ OPTIONS
 EXCLUDE **/*~                   # Exclude anything that ends in a ~
 
 # Backup /home/
-DISK /home
+DISK   /home
 BACKUP /localbackup/home
 BACKUP /nas/backup/home
 
 # Backup /data/
-DISK /data
-BACKUP /nas/backup/data
-EXCLUDE tmp/                    # Exclude any tmp directories
+DISK    /data
+BACKUP  /nas/backup/data              # Backup locally
+BACKUP  user@remotehost:/backup/data  # Backup over ssh
+EXCLUDE tmp/                          # Exclude any tmp directories
 
 # Backup PostgreSQL database on port 5432
 DATABASE 5432
 BACKUP /nas/backup/pg/5432.sql
 
 __EOF
+    }
 
     exit 0;
 }
