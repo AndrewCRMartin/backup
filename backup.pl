@@ -4,8 +4,8 @@
 #   Program:    backup
 #   File:       backup.pl
 #   
-#   Version:    V1.1
-#   Date:       15.08.16
+#   Version:    V1.2
+#   Date:       20.08.16
 #   Function:   Flexible backup script
 #   
 #   Copyright:  (c) Dr. Andrew C. R. Martin, UCL, 2016
@@ -52,6 +52,7 @@
 #   =================
 #   V1.0   12.08.16  Original   By: ACRM
 #   V1.1   14.06.16  Added -delete and -nodelete options
+#   V1.2   20.06.16  Added -c option
 #
 #*************************************************************************
 # Add the path of the executable to the library path
@@ -93,6 +94,10 @@ if(defined($::init))
 {
     InitBackupDirs($hDisks);
 }
+elsif(defined($::c))
+{
+    PrintLastBackups($hDisks);
+}
 else
 {
     my $diskBackupErrors     = BackupDisks($hDisks, $hExclude, 
@@ -120,15 +125,16 @@ sub UsageDie
 {
     print <<__EOF;
 
-Backup V1.1 (c) 2016 Dr. Andrew C.R. Martin, UCL
+Backup V1.2 (c) 2016 Dr. Andrew C.R. Martin, UCL
 
-Usage: backup [-h][-n][-nr][-q][-v][-create][-init]
+Usage: backup [-h][-n][-nr][-q][-v][-create][-init][-c]
               [-nodelete][-delete]     [backup.conf]
        -h        This help message
        -n        Pretend to do the backup
        -nr       Make rsync pretend to do the backup
        -q        Run quietly
        -qr       Make rsync run quietly
+       -c        Check when backups were last done
        -create   Create destination directories if they do not exist
        -init     Initializes all directories and adds .runbackup file 
                  to each
@@ -157,11 +163,26 @@ then the program will look for 'backup.conf' in the current directory
 and, if not found, then will look for 'backup.conf' in the directory
 where the backup program lives.
 
+The program ensures that a file called '.runbackup' is present in 
+both the source and destination directories. This ensures that 
+a) a backup is not run to a destination that has gone away (e.g. 
+not been mounted and therefore filling the wrong disk) and b) that 
+the source has not gone away (potentially deleting the content of
+the backup). Run with -init to create these files everywhere.
+The time and date at which a backup is completed is also written
+into the destination .runbackup file and is then checked when the
+program is run with -c so you can quickly check when a backup was
+last performed.
+
 NOTE! rsync must be installed and in your path. pg_dumpall from the
 PostgreSQL package must be available in your path if you wish to
 backup databases.
 
 Example config file...
+
+# Set global excludes
+OPTIONS
+EXCLUDE **/*~                   # Exclude anything that ends in a ~
 
 # Backup /home/
 DISK /home
@@ -172,7 +193,6 @@ BACKUP /nas/backup/home
 DISK /data
 BACKUP /nas/backup/data
 EXCLUDE tmp/                    # Exclude any tmp directories
-EXCLUDE **/*~                   # Exclude anything that ends in a ~
 
 # Backup PostgreSQL database on port 5432
 DATABASE 5432
@@ -384,9 +404,24 @@ sub RunDiskBackup
 		if(CheckExists($destination, 0, IS_DIR, $::create, 
 			       VERBOSE, DESTINATION))
 		{
-		    print STDERR ">>> Backing up $source to $destination\n" if(!defined($::q));
-		    my $exe = "rsync $backupOptions $doDelete $exclude $source $destination";
-		    RunExe("$exe");
+                    my $theDestination = $destination;
+                    $theDestination .= "/" if(!($destination =~ /\/$/));
+                    if(CheckExists($theDestination.".runbackup", 0, IS_FILE, $::create, 
+                                   QUIET, DESTINATION))
+                    {
+                        print STDERR ">>> Backing up $source to $destination\n" if(!defined($::q));
+                        my $exe = "rsync $backupOptions $doDelete $exclude $source $destination";
+                        RunExe("$exe");
+
+                        # Touch the runbackup file on the destination so we can check when a 
+                        # backup was last run.
+                        $exe = "date > $destination/.runbackup";
+                        RunExe("$exe");
+                    }
+                    else
+                    {
+                        print STDERR "*** INFO: Backup skipped since .runbackup file doesn't exist in $destination\n";
+                    }
 		}
 		else
 		{
@@ -636,3 +671,32 @@ sub SetConfigFile
 
     return($configFile);
 }
+
+
+#*************************************************************************
+# PrintLastBackups($hDisks)
+# -------------------------
+# Prints times at which the last backups were run based on the .runbackup
+# files in the destination directories.
+#
+# 12.08.16  Original   By: ACRM
+sub PrintLastBackups
+{
+    my ($hDisks) = @_;
+
+    foreach my $source (keys %$hDisks)
+    {
+	my @destinations = @{$$hDisks{$source}};
+	foreach my $destination (@destinations)
+	{
+	    my $theDestination = $destination;
+            $theDestination .= "/" if(!($theDestination =~ /\/$/));
+	    $theDestination .= ".runbackup"; 
+            print "$source -> $destination\n   ";
+	    RunExe("cat $theDestination");
+            print "\n";
+	}
+    }
+}
+
+
