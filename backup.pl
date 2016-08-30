@@ -4,8 +4,8 @@
 #   Program:    backup
 #   File:       backup.pl
 #   
-#   Version:    V1.0
-#   Date:       12.08.16
+#   Version:    V1.1
+#   Date:       15.08.16
 #   Function:   Flexible backup script
 #   
 #   Copyright:  (c) Dr. Andrew C. R. Martin, UCL, 2016
@@ -51,6 +51,7 @@
 #   Revision History:
 #   =================
 #   V1.0   12.08.16  Original   By: ACRM
+#   V1.1   14.06.16  Added -delete and -nodelete options
 #
 #*************************************************************************
 # Add the path of the executable to the library path
@@ -75,6 +76,7 @@ use constant IS_DIR      => 1;
 use constant IS_FILE     => 0;
 use constant DESTINATION => "Destination";
 use constant SOURCE      => "Source";
+use constant DELETE      => "--delete";
 
 # Configuration and options
 my $configFile = SetConfigFile($FindBin::Bin, @ARGV);
@@ -118,40 +120,61 @@ sub UsageDie
 {
     print <<__EOF;
 
-Backup V1.0 (c) Dr. Andrew C.R. Martin, UCL
+Backup V1.1 (c) 2016 Dr. Andrew C.R. Martin, UCL
 
-Usage: backup [-h][-n][-nr][-q][-v][-create][-init] [backup.conf]
-       -h      This help message
-       -n      Pretend to do the backup
-       -nr     Make rsync pretend to do the backup
-       -q      Run quietly
-       -qr     Make rsync run quietly
-       -create Create destination directories if they do not exist
-       -init   Initializes all directories and adds .runbackup file 
-               to each
+Usage: backup [-h][-n][-nr][-q][-v][-create][-init]
+              [-nodelete][-delete]     [backup.conf]
+       -h        This help message
+       -n        Pretend to do the backup
+       -nr       Make rsync pretend to do the backup
+       -q        Run quietly
+       -qr       Make rsync run quietly
+       -create   Create destination directories if they do not exist
+       -init     Initializes all directories and adds .runbackup file 
+                 to each
+       -delete   Force deletion of files on the backup if they have
+                 gone away in the source directory even if it is not
+                 Sunday.
+       -nodelete Prevent deletion of files on the backup if they have
+                 gone away in the source directory even if it is 
+                 Sunday. (Takes precedent over -delete)
+               
 
-Backup is a flexible backup program for performing backups using rsync. 
-It takes a config file which lists the directories to be backed up and,
-for each, one or more destinations to which they are backed up and one
-or more files/directories to be excluded. It can also back up local 
-PostgreSQL databases - specify a port and one or more files to dump
-the backup to.
+Backup is a flexible backup program for performing backups using
+rsync.  It takes a config file which lists the directories to be
+backed up and, for each, one or more destinations to which they are
+backed up and one or more files/directories to be excluded. See the
+rsync(1) documentation for the format for specifying these. It can
+also back up local PostgreSQL databases - specify a port and one or
+more files to dump the backup to.
+
+By default the program only deletes files on the backup if they have
+gone away in the source directory if the program is run on a Sunday.
+The -delete/-nodelete options override this.
 
 The configuration file may be specified on the command line. If not,
 then the program will look for 'backup.conf' in the current directory
 and, if not found, then will look for 'backup.conf' in the directory
 where the backup program lives.
 
+NOTE! rsync must be installed and in your path. pg_dumpall from the
+PostgreSQL package must be available in your path if you wish to
+backup databases.
+
 Example config file...
 
+# Backup /home/
 DISK /home
 BACKUP /localbackup/home
 BACKUP /nas/backup/home
 
+# Backup /data/
 DISK /data
 BACKUP /nas/backup/data
-EXCLUDE tmp
+EXCLUDE tmp/                    # Exclude any tmp directories
+EXCLUDE **/*~                   # Exclude anything that ends in a ~
 
+# Backup PostgreSQL database on port 5432
 DATABASE 5432
 BACKUP /nas/backup/pg/5432.sql
 
@@ -478,13 +501,22 @@ sub CheckExists
 # files during the week
 #
 # 12.08.16  Original   By: ACRM
+# 15.06.16  Now checks the command line for -delete -nodelete
 sub SetDeleteIfSunday
 {
     my $delete = ' ';
     my $day = substr(localtime, 0, 3);
-    if($day eq 'Sun')
+    if(defined($::nodelete))
     {
-	$delete = '--delete';
+	$delete = '';
+    }
+    elsif(defined($::delete))
+    {
+	$delete = DELETE;
+    }
+    elsif($day eq 'Sun')
+    {
+	$delete = DELETE;
     }
     return($delete);
 }
