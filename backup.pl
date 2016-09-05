@@ -4,8 +4,8 @@
 #   Program:    backup
 #   File:       backup.pl
 #   
-#   Version:    V1.3
-#   Date:       30.08.16
+#   Version:    V1.4
+#   Date:       05.09.16
 #   Function:   Flexible backup script
 #   
 #   Copyright:  (c) Dr. Andrew C. R. Martin, UCL, 2016
@@ -123,7 +123,7 @@ else
 # Prints a usage message
 #
 # 12.08.16  Original   By: ACRM
-# 30.08.16  Added example parameter
+# 30.08.16  Added -h=config parameter
 sub UsageDie
 {
     my($example) = @_;
@@ -132,7 +132,7 @@ sub UsageDie
     {
         print <<__EOF;
 
-Backup V1.3 (c) 2016 Dr. Andrew C.R. Martin, UCL
+Backup V1.4 (c) 2016 Dr. Andrew C.R. Martin, UCL
 
 Usage: backup [-h[=config]][-n][-nr][-q][-v][-create][-init][-c]
               [-nodelete][-delete]     [backup.conf]
