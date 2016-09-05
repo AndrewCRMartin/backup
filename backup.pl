@@ -54,6 +54,7 @@
 #   V1.1   14.06.16  Added -delete and -nodelete options
 #   V1.2   20.06.16  Added -c option
 #   V1.3   30.08.16  Improved help
+#   V1.4   05.09.16  Added --delete-excluded to rsync delete options
 #
 #*************************************************************************
 # Add the path of the executable to the library path
@@ -78,7 +79,7 @@ use constant IS_DIR      => 1;
 use constant IS_FILE     => 0;
 use constant DESTINATION => "Destination";
 use constant SOURCE      => "Source";
-use constant DELETE      => "--delete";
+use constant DELETE      => "--delete --delete-excluded";
 
 # Configuration and options
 my $configFile = SetConfigFile($FindBin::Bin, @ARGV);
