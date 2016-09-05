@@ -62,21 +62,19 @@ if [ "X$BIN" == "X" ]; then
 fi
 
 # Check for pre-existing files and allow user to abort
-if [ $SCRIPTS == $DEFSCRIPTS ] && [ $BIN == $DEFBIN ]; then
-    if [ -e "$SCRIPTS/backup.pl" ]; then
-        echo -n "$SCRIPTS/backup.pl exists already. Overwrite? (Y/N) [Y]: "
-        read yorn
-        if [ "X$yorn" == "XN" ] || [ "X$yorn" == "Xn" ]; then
-            AbortInstall;
-        fi
+if [ -e "$SCRIPTS/backup.pl" ]; then
+    echo -n "$SCRIPTS/backup.pl exists already. Overwrite? (Y/N) [Y]: "
+    read yorn
+    if [ "X$yorn" == "XN" ] || [ "X$yorn" == "Xn" ]; then
+        AbortInstall;
     fi
+fi
 
-    if [ -e "$BIN/backup" ]; then
-        echo -n "$BIN/backup exists already. Overwrite? (Y/N) [Y]: "
-        read yorn
-        if [ "X$yorn" == "XN" ] || [ "X$yorn" == "Xn" ]; then
-            AbortInstall;
-        fi
+if [ -e "$BIN/backup" ]; then
+    echo -n "$BIN/backup exists already. Overwrite? (Y/N) [Y]: "
+    read yorn
+    if [ "X$yorn" == "XN" ] || [ "X$yorn" == "Xn" ]; then
+        AbortInstall;
     fi
 fi
 
