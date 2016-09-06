@@ -108,16 +108,16 @@ elsif(defined($::c))
 else
 {
     my $diskBackupErrors     = BackupDisks($hDisks, $hExclude, 
-					   $backupOptions, $doDelete);
+                                           $backupOptions, $doDelete);
     my $databaseBackupErrors = BackupDatabases($hDatabases);
 
     if($diskBackupErrors)
     {
-	print STDERR "\n\n*** ERROR BACKING UP DISKS: $diskBackupErrors missing distination directories\n\n";
+        print STDERR "\n\n*** ERROR BACKING UP DISKS: $diskBackupErrors missing distination directories\n\n";
     }
     if($databaseBackupErrors)
     {
-	print STDERR "\n\n*** ERROR BACKING UP DATABASES: $databaseBackupErrors missing distination directories\n\n";
+        print STDERR "\n\n*** ERROR BACKING UP DATABASES: $databaseBackupErrors missing distination directories\n\n";
     }
 }
 
@@ -187,10 +187,13 @@ into the destination .runbackup file and is then checked when the
 program is run with -c so you can quickly check when a backup was
 last performed.
 
-NOTE! rsync must be installed and in your path. pg_dumpall from the
+NOTE!! rsync must be installed and in your path. pg_dumpall from the
 PostgreSQL package must be available in your path if you wish to
 backup databases. You can use the PGDUMP command under OPTIONS to
 set this to something else.
+
+NOTE!! For database backups, the destination directory must be 
+writeable by the 'postgres' super-user.
 
 __EOF
     }
@@ -238,13 +241,13 @@ sub CheckConfigAndDieOnError
 
     foreach my $hConfigHash (@configHashes)
     {
-	foreach my $source (keys %$hConfigHash)
-	{
-	    my @destinations = @{$$hConfigHash{$source}};
-	    foreach my $destination (@destinations)
-	    {
-		if(!($destination =~ /^\//))
-		{
+        foreach my $source (keys %$hConfigHash)
+        {
+            my @destinations = @{$$hConfigHash{$source}};
+            foreach my $destination (@destinations)
+            {
+                if(!($destination =~ /^\//))
+                {
                     if($destination =~ /^(.*)\//)
                     {
                         my $host = $1;
@@ -259,10 +262,10 @@ sub CheckConfigAndDieOnError
                         print STDERR "\n*** BACKUP CONFIG ERROR - all destination paths must start with a / ***\n\n";
                         exit 1;
                     }
-		}
-	    }
-	}
-    }	
+                }
+            }
+        }
+    }   
 }
 
 
@@ -280,31 +283,31 @@ sub InitBackupDirs
 
     foreach my $source (keys %$hDisks)
     {
-	my $theSource = $source;
+        my $theSource = $source;
 
-	# Add / to end of source if missing
-	$theSource .= '/' if(!($theSource =~ /\/$/));  
-	if(!CheckExists($theSource, 0, IS_DIR, NOCREATE, VERBOSE, SOURCE))
-	{
-	    exit 1;
-	}
+        # Add / to end of source if missing
+        $theSource .= '/' if(!($theSource =~ /\/$/));  
+        if(!CheckExists($theSource, 0, IS_DIR, NOCREATE, VERBOSE, SOURCE))
+        {
+            exit 1;
+        }
 
-	$theSource .= ".runbackup"; 
-	RunExe("touch $theSource");
+        $theSource .= ".runbackup"; 
+        RunExe("touch $theSource");
 
-	my @destinations = @{$$hDisks{$source}};
-	foreach my $destination (@destinations)
-	{
-	    my $theDestination = $destination;
+        my @destinations = @{$$hDisks{$source}};
+        foreach my $destination (@destinations)
+        {
+            my $theDestination = $destination;
 
-	    # Add / to end of destination if missing
-	    $theDestination .= '/' if(!($theDestination =~ /\/$/));
-	    CheckExists($theDestination, 0, IS_DIR, CREATE, 
-			VERBOSE, DESTINATION);
+            # Add / to end of destination if missing
+            $theDestination .= '/' if(!($theDestination =~ /\/$/));
+            CheckExists($theDestination, 0, IS_DIR, CREATE, 
+                        VERBOSE, DESTINATION);
 
-	    $theDestination .= ".runbackup"; 
-	    RunExe("touch $theDestination");
-	}
+            $theDestination .= ".runbackup"; 
+            RunExe("touch $theDestination");
+        }
     }
 }
 
@@ -321,9 +324,9 @@ sub BackupDatabases
     my $totalErrors = 0;
     foreach my $database (keys %$hDatabases)
     {
-	my $errors;
-	$errors = RunDatabaseBackup($database, $$hDatabases{$database});
-	$totalErrors += $errors;
+        my $errors;
+        $errors = RunDatabaseBackup($database, $$hDatabases{$database});
+        $totalErrors += $errors;
     }
 
     return($totalErrors);
@@ -337,6 +340,7 @@ sub BackupDatabases
 # 12.08.16  Original   By: ACRM
 # 06.09.16  Now allows databases to be specified as host:port rather than
 #           just the port
+#           Runs pg_dumpall as root but specifying the postgres superuser
 sub RunDatabaseBackup
 {
     my($database, $aDestinations) = @_;
@@ -362,17 +366,18 @@ sub RunDatabaseBackup
 
     foreach my $destination (@$aDestinations)
     {
-	print STDERR ">>> Backing up PostgreSQL database on port $database to $destination...\n" if(!defined($::q));
+        print STDERR ">>> Backing up PostgreSQL database on port $database to $destination...\n" if(!defined($::q));
 
-	if(CheckExists($destination, 1, IS_DIR, $::create, 
-		       VERBOSE, DESTINATION))
-	{
-	    my $exe = "su - postgres -c \"$::pgdump --port=$port --host=$host >$destination\"";
+        if(CheckExists($destination, 1, IS_DIR, $::create, 
+                       VERBOSE, DESTINATION))
+        {
+            my $exe = "su - postgres -c \"$::pgdump --port=$port --host=$host >$destination\"";
+#           my $exe = "$::pgdump --user=postgres --port=$port --host=$host >$destination";
             RunExe($exe);
         }
-	else
+        else
         {
-	    $errors++;
+            $errors++;
         }
     }
     return($errors)
@@ -392,7 +397,7 @@ sub BackupDisks
 
     foreach my $source (keys %$hDisks)
     {
-	my $errors;
+        my $errors;
         my @excludes = ();
         if(defined($$hExclude{$source}))
         {
@@ -403,11 +408,11 @@ sub BackupDisks
             push @excludes, @{$$hExclude{'ALL'}};
         }
 
-	$errors = RunDiskBackup($source, 
-				\@excludes,
-				$$hDisks{$source}, 
-				$backupOptions, $doDelete);
-	$totalErrors += $errors;
+        $errors = RunDiskBackup($source, 
+                                \@excludes,
+                                $$hDisks{$source}, 
+                                $backupOptions, $doDelete);
+        $totalErrors += $errors;
     }
 
     return($totalErrors);
@@ -434,19 +439,19 @@ sub RunDiskBackup
     my $exclude = '';
     foreach my $excl (@$aExcludes)
     {
-	$exclude .= "--exclude=$excl ";
+        $exclude .= "--exclude=$excl ";
     }
 
     if(CheckExists($source, 0, IS_DIR, NOCREATE, VERBOSE, SOURCE))
     {
-	if(CheckExists($source.".runbackup", 0, IS_FILE, NOCREATE, 
-		       QUIET, SOURCE))
-	{
-	    foreach my $destination (@$aDestinations)
-	    {
-		if(CheckExists($destination, 0, IS_DIR, $::create, 
-			       VERBOSE, DESTINATION))
-		{
+        if(CheckExists($source.".runbackup", 0, IS_FILE, NOCREATE, 
+                       QUIET, SOURCE))
+        {
+            foreach my $destination (@$aDestinations)
+            {
+                if(CheckExists($destination, 0, IS_DIR, $::create, 
+                               VERBOSE, DESTINATION))
+                {
                     my $theDestination = $destination;
                     $theDestination .= "/" if(!($destination =~ /\/$/));
                     if(CheckExists($theDestination.".runbackup", 0, IS_FILE, $::create, 
@@ -465,17 +470,17 @@ sub RunDiskBackup
                     {
                         print STDERR "*** INFO: Backup skipped since .runbackup file doesn't exist in $destination\n";
                     }
-		}
-		else
-		{
-		    $errors++;
-		}
-	    }
-	}
-	else
-	{
-	    print STDERR "*** INFO: Backup skipped since .runbackup file doesn't exist in $source\n";
-	}
+                }
+                else
+                {
+                    $errors++;
+                }
+            }
+        }
+        else
+        {
+            print STDERR "*** INFO: Backup skipped since .runbackup file doesn't exist in $source\n";
+        }
     }
 
     return($errors);
@@ -497,12 +502,12 @@ sub RunExe
 
     if(defined($::n) || defined($::v))
     {
-	print "$exe\n";
+        print "$exe\n";
     }
 
     if(!defined($::n))
     {
-	system($exe);
+        system($exe);
     }
 }
 
@@ -537,35 +542,35 @@ sub CheckExists
 
     if($parent)
     {
-	$dir =~ s/\/$//;  # Remove trailing /
-	my @fields = split(/\//, $dir);
-	$dir = '/';
-	for(my $i=1; $i<scalar(@fields) - $parent; $i++)
-	{
-	    $dir .= $fields[$i] . '/';
-	}
+        $dir =~ s/\/$//;  # Remove trailing /
+        my @fields = split(/\//, $dir);
+        $dir = '/';
+        for(my $i=1; $i<scalar(@fields) - $parent; $i++)
+        {
+            $dir .= $fields[$i] . '/';
+        }
     }
 
     if(($isdir  && (-d $dir)) ||
        (!$isdir && (-f $dir)))
     {
-	return(1);
+        return(1);
     }
 
     if($create)
     {
-	print STDERR "*** BACKUP INFO - Creating $type directory: $dir\n";
-	system("mkdir -p $dir");
-	if(!(-d $dir))
-	{
-	    print STDERR "*** BACKUP FATAL - Could not create $type directory: $dir\n";
-	    exit 1;
-	}
-	return(1);
+        print STDERR "*** BACKUP INFO - Creating $type directory: $dir\n";
+        system("mkdir -p $dir");
+        if(!(-d $dir))
+        {
+            print STDERR "*** BACKUP FATAL - Could not create $type directory: $dir\n";
+            exit 1;
+        }
+        return(1);
     }
     elsif($verbose)
     {
-	print STDERR "*** BACKUP FAILED - $type directory does not exist: $dir\n";
+        print STDERR "*** BACKUP FAILED - $type directory does not exist: $dir\n";
     }
 
     return(0);
@@ -586,15 +591,15 @@ sub SetDeleteIfSunday
     my $day = substr(localtime, 0, 3);
     if(defined($::nodelete))
     {
-	$delete = '';
+        $delete = '';
     }
     elsif(defined($::delete))
     {
-	$delete = DELETE;
+        $delete = DELETE;
     }
     elsif($day eq 'Sun')
     {
-	$delete = DELETE;
+        $delete = DELETE;
     }
     return($delete);
 }
@@ -619,44 +624,44 @@ sub ReadConf
 
     if(open(my $fp, '<', $confFile))
     {
-	while(<$fp>)
-	{
-	    chomp;
-	    s/\#.*//;    # Remove comments
-	    s/^\s+//;    # Remove leading spaces
-	    if(length)
-	    {
-		if(/^DISK\s+(.*)/)
-		{
-		    $source  = $1;
-		    $db      = '';
+        while(<$fp>)
+        {
+            chomp;
+            s/\#.*//;    # Remove comments
+            s/^\s+//;    # Remove leading spaces
+            if(length)
+            {
+                if(/^DISK\s+(.*)/)
+                {
+                    $source  = $1;
+                    $db      = '';
                     $options = 0;
-		}
-		elsif(/^DATABASE\s+(.*)/)
-		{
-		    $source  = '';
-		    $db      = $1;
+                }
+                elsif(/^DATABASE\s+(.*)/)
+                {
+                    $source  = '';
+                    $db      = $1;
                     $options = 0;
-		}
-		elsif(/^OPTIONS/)
-		{
-		    $source  = '';
-		    $db      = '';
+                }
+                elsif(/^OPTIONS/)
+                {
+                    $source  = '';
+                    $db      = '';
                     $options = 1;
-		}
-		elsif(/^BACKUP\s+(.*)/)
-		{
-		    if($source ne '')
-		    {
-			push(@{$disks{$source}}, $1);
-		    }
-		    elsif($db ne '')
-		    {
-			push(@{$databases{$db}}, $1);
-		    }
-		}
-		elsif(/^EXCLUDE\s+(.*)/)
-		{
+                }
+                elsif(/^BACKUP\s+(.*)/)
+                {
+                    if($source ne '')
+                    {
+                        push(@{$disks{$source}}, $1);
+                    }
+                    elsif($db ne '')
+                    {
+                        push(@{$databases{$db}}, $1);
+                    }
+                }
+                elsif(/^EXCLUDE\s+(.*)/)
+                {
                     if($source ne '')
                     {
                         push(@{$exclude{$source}}, $1);
@@ -665,18 +670,18 @@ sub ReadConf
                     {
                         push(@{$exclude{'ALL'}}, $1);
                     }
-		}
+                }
                 elsif($options && /^PGDUMP\s+(.*)/)
                 {
                     $::pgdump = $1;
                 }
-	    }
-	}
+            }
+        }
     }
     else
     {
-	print STDERR "\n***BACKUP FATAL - Unable to read configuration file: $confFile\n\n";
-	exit 1;
+        print STDERR "\n***BACKUP FATAL - Unable to read configuration file: $confFile\n\n";
+        exit 1;
     }
 
     return(\%disks, \%exclude, \%databases);
@@ -699,21 +704,21 @@ sub SetConfigFile
 
     if(scalar(@argv))
     {
-	$configFile = $argv[0];
+        $configFile = $argv[0];
     }
     elsif(-f './backup.conf')
     {
-	$configFile = './backup.conf';
+        $configFile = './backup.conf';
     }
     else
     {
-	$configFile = "$binDir/backup.conf";
+        $configFile = "$binDir/backup.conf";
     }
 
     if(!(-f $configFile))
     {
-	printf STDERR "\n*** BACKUP FATAL - Configuration file not found: $configFile\n\n";
-	exit 1;
+        printf STDERR "\n*** BACKUP FATAL - Configuration file not found: $configFile\n\n";
+        exit 1;
     }
 
     return($configFile);
@@ -733,16 +738,16 @@ sub PrintLastBackups
 
     foreach my $source (keys %$hDisks)
     {
-	my @destinations = @{$$hDisks{$source}};
-	foreach my $destination (@destinations)
-	{
-	    my $theDestination = $destination;
+        my @destinations = @{$$hDisks{$source}};
+        foreach my $destination (@destinations)
+        {
+            my $theDestination = $destination;
             $theDestination .= "/" if(!($theDestination =~ /\/$/));
-	    $theDestination .= ".runbackup"; 
+            $theDestination .= ".runbackup"; 
             print "$source -> $destination\n   ";
-	    RunExe("cat $theDestination");
+            RunExe("cat $theDestination");
             print "\n";
-	}
+        }
     }
 }
 
