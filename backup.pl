@@ -4,8 +4,8 @@
 #   Program:    backup
 #   File:       backup.pl
 #   
-#   Version:    V1.4
-#   Date:       05.09.16
+#   Version:    V1.5
+#   Date:       06.09.16
 #   Function:   Flexible backup script
 #   
 #   Copyright:  (c) Dr. Andrew C. R. Martin, UCL, 2016
@@ -55,6 +55,8 @@
 #   V1.2   20.06.16  Added -c option
 #   V1.3   30.08.16  Improved help
 #   V1.4   05.09.16  Added --delete-excluded to rsync delete options
+#   V1.5   06.09.16  Allows host:port for database specification
+#                    Checks that pg_dumpall exists
 #
 #*************************************************************************
 # Add the path of the executable to the library path
@@ -88,6 +90,9 @@ my $backupOptions = "-a --exclude=lost+found";
 my $doDelete      = SetDeleteIfSunday();
 $backupOptions   .= " -v" if(!defined($::q) && !defined($::qr));
 $backupOptions   .= " -n" if(defined($::nr));
+
+# Global variables
+$::pgdump = "pg_dumpall"
 
 CheckConfigAndDieOnError($hDisks, $hDatabases);
 
@@ -132,7 +137,7 @@ sub UsageDie
     {
         print <<__EOF;
 
-Backup V1.4 (c) 2016 Dr. Andrew C.R. Martin, UCL
+Backup V1.5 (c) 2016 Dr. Andrew C.R. Martin, UCL
 
 Usage: backup [-h[=config]][-n][-nr][-q][-v][-create][-init][-c]
               [-nodelete][-delete]     [backup.conf]
@@ -184,7 +189,8 @@ last performed.
 
 NOTE! rsync must be installed and in your path. pg_dumpall from the
 PostgreSQL package must be available in your path if you wish to
-backup databases.
+backup databases. You can use the PGDUMP command under OPTIONS to
+set this to something else.
 
 __EOF
     }
@@ -196,7 +202,8 @@ Example config file...
 
 # Set global excludes
 OPTIONS
-EXCLUDE **/*~                   # Exclude anything that ends in a ~
+EXCLUDE **/*~                         # Exclude anything that ends in a ~
+PGDUMP  /usr/local/bin/pg_dumpall     # Full specification for pg_dumpall
 
 # Backup /home/
 DISK   /home
@@ -209,8 +216,8 @@ BACKUP  /nas/backup/data              # Backup locally
 BACKUP  user@remotehost:/backup/data  # Backup over ssh
 EXCLUDE tmp/                          # Exclude any tmp directories
 
-# Backup PostgreSQL database on port 5432
-DATABASE 5432
+# Backup PostgreSQL database on the local host on port 5432
+DATABASE localhost:5432
 BACKUP /nas/backup/pg/5432.sql
 
 __EOF
@@ -328,10 +335,30 @@ sub BackupDatabases
 # Run a PostgreSQL database backup
 #
 # 12.08.16  Original   By: ACRM
+# 06.09.16  Now allows databases to be specified as host:port rather than
+#           just the port
 sub RunDatabaseBackup
 {
     my($database, $aDestinations) = @_;
     my $errors = 0;
+    my $host   = 'localhost';
+    my $port   = 5432;
+
+    if(! -x $::pgdump)
+    {
+        print STDERR "\n\n*** ERROR BACKING UP DATABASES: $::pgdump not available\n";
+        return(0);
+    }
+
+    if($database =~ /\:/)
+    {
+        ($host, $port) = split(/\:/, $database);
+    }
+    else
+    {
+        $port = $database;
+    }
+
 
     foreach my $destination (@$aDestinations)
     {
@@ -340,7 +367,7 @@ sub RunDatabaseBackup
 	if(CheckExists($destination, 1, IS_DIR, $::create, 
 		       VERBOSE, DESTINATION))
 	{
-	    my $exe = "su - postgres -c \"pg_dumpall --port=$database >$destination\"";
+	    my $exe = "su - postgres -c \"$::pgdump --port=$port --host=$host >$destination\"";
             RunExe($exe);
         }
 	else
@@ -639,6 +666,10 @@ sub ReadConf
                         push(@{$exclude{'ALL'}}, $1);
                     }
 		}
+                elsif($options && /^PGDUMP\s+(.*)/)
+                {
+                    $::pgdump = $1;
+                }
 	    }
 	}
     }
