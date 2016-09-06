@@ -83,6 +83,9 @@ use constant DESTINATION => "Destination";
 use constant SOURCE      => "Source";
 use constant DELETE      => "--delete --delete-excluded";
 
+# Global variables
+$::pgdump = "pg_dumpall";
+
 # Configuration and options
 my $configFile = SetConfigFile($FindBin::Bin, @ARGV);
 my ($hDisks, $hExclude, $hDatabases) = ReadConf($configFile);
@@ -90,9 +93,6 @@ my $backupOptions = "-a --exclude=lost+found";
 my $doDelete      = SetDeleteIfSunday();
 $backupOptions   .= " -v" if(!defined($::q) && !defined($::qr));
 $backupOptions   .= " -n" if(defined($::nr));
-
-# Global variables
-$::pgdump = "pg_dumpall"
 
 CheckConfigAndDieOnError($hDisks, $hDatabases);
 
