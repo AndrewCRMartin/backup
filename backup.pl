@@ -371,8 +371,10 @@ sub RunDatabaseBackup
         if(CheckExists($destination, 1, IS_DIR, $::create, 
                        VERBOSE, DESTINATION))
         {
-            my $exe = "su - postgres -c \"$::pgdump --port=$port --host=$host >$destination\"";
-#           my $exe = "$::pgdump --user=postgres --port=$port --host=$host >$destination";
+            my $exe = "su - postgres -c \"$::pgdump --port=$port --host=$host >$destination.tmp\"";
+#           my $exe = "$::pgdump --user=postgres --port=$port --host=$host >$destination.tmp";
+            RunExe($exe);
+            $exe = "mv -f $destination.tmp $destination";
             RunExe($exe);
         }
         else
