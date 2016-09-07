@@ -64,19 +64,17 @@ The configuration file has three sections:
 
 ### OPTIONS
 
-The `OPTIONS` section defines global settings. Currently two settings
+The `OPTIONS` section defines global settings. Currently four settings
 are supported:
 
 1. `EXCLUDE` is used to define patterns for files that should be
 excluded from all backups. Typically this might be used to exclude
 editor backup files, compiler object files, etc. Multiple `EXCLUDE`
 records may be specified. A typical setting would be:
-
 ```
    EXCLUDE **/*~
    EXCLUDE *.o
 ```
-
 The pattern syntax is as used by `rsync`.
 
 2. `PGDUMP` is used to specify the location of the PostgreSQL
@@ -107,13 +105,13 @@ By default, the script uses the `su` command to become the PostgreSQL
 superuser. This means that the script must be run as root (since
 otherwise a password would be needed to change user). It also means
 that the directory where the database backup is placed must be
-writeable by the PostgreSQL superuser.
+writable by the PostgreSQL superuser.
 
 If `PGNOSU` is specified, then the script doesn't change to run as the
 PostgreSQL superuser, but instead simply runs the `pg_dumpall` program
 specifying that the dump should be done as the PostgreSQL superuser
 (with the `--user` option). This does not require that `backup` is run
-by root or that the destination directory is writeable by the
+by root or that the destination directory is writable by the
 PostgreSQL superuser. However it does require that the PostgreSQL
 superuser is not password protected in the database.
 
@@ -141,7 +139,7 @@ machine.
 
 Optionally, one or more `EXCLUDE` commands may be used to exclude
 patterns from the backup. This works in the same way as the `EXCLUDE`
-command in th `OPTIONS` section, but is restricted to this particular
+command in the `OPTIONS` section, but is restricted to this particular
 disk's backups.
 
 **Note** The `DISK` command is used to specify a directory whose
@@ -175,7 +173,7 @@ backup file. e.g.
 ```
 
 **Note 1** The destination backup directory (in this case
-`/nas/backup/pg`), must be writeable by the `postgresql` user.
+`/nas/backup/pg`), must be writable by the PostgreSQL superuser.
 
 **Note 2** Remote backups over SSH are not currently supported.
 However, you can always run a standard file-type backup of an SQL
@@ -210,7 +208,7 @@ Initialization
 
 `backup` takes a cautious approach to performing backups. To do this,
 it keeps a file called `.runbackup` in each source directory and in
-each destination directotry. This ensures that no "backup" is
+each destination directory. This ensures that no "backup" is
 performed if either the source or destination directory has been
 unmounted.
 
