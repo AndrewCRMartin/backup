@@ -96,15 +96,14 @@ By default, the script uses the `su` command to become the PostgreSQL
 superuser. This means that the script must be run as root (since
 otherwise a password would be needed to change user). It also means
 that the directory where the database backup is placed must be
-writable by the PostgreSQL superuser.
-
-If `PGNOSU` is specified, then the script doesn't change to run as the
-PostgreSQL superuser, but instead simply runs the `pg_dumpall` program
-specifying that the dump should be done as the PostgreSQL superuser
-(with the `--user` option). This does not require that `backup` is run
-by root or that the destination directory is writable by the
-PostgreSQL superuser. However it does require that the PostgreSQL
-superuser is not password protected in the database.
+writable by the PostgreSQL superuser.  If `PGNOSU` is specified, then
+the script doesn't change to run as the PostgreSQL superuser, but
+instead simply runs the `pg_dumpall` program specifying that the dump
+should be done as the PostgreSQL superuser (with the `--user`
+option). This does not require that `backup` is run by root or that
+the destination directory is writable by the PostgreSQL
+superuser. However it does require that the PostgreSQL superuser is
+not password protected in the database.
 
 ### DISK
 
