@@ -71,6 +71,7 @@ are supported:
 excluded from all backups. Typically this might be used to exclude
 editor backup files, compiler object files, etc. Multiple `EXCLUDE`
 records may be specified. A typical setting would be:
+
         ```EXCLUDE **/*~
         EXCLUDE *.o
         ```
