@@ -89,6 +89,33 @@ The pattern syntax is as used by `rsync`.
 If not specified, it is assumed that `pg_dumpall` is available in the
 standard path.
 
+3. `PGSUPERUSER` is used to specify the PostgreSQL superuser. This
+defaults to `postgres`. e.g.
+
+```
+   PGSUPERUSER johnsmith
+```
+
+4. `PGNOSU` is used to change the way that the `pg_dumpall` program is
+run. e.g.
+
+```
+   PGNOSU
+```
+
+By default, the script uses the `su` command to become the PostgreSQL
+superuser. This means that the script must be run as root (since
+otherwise a password would be needed to change user). It also means
+that the directory where the database backup is placed must be
+writeable by the PostgreSQL superuser.
+
+If `PGNOSU` is specified, then the script doesn't change to run as the
+PostgreSQL superuser, but instead simply runs the `pg_dumpall` program
+specifying that the dump should be done as the PostgreSQL superuser
+(with the `--user` option). This does not require that `backup` is run
+by root or that the destination directory is writeable by the
+PostgreSQL superuser. However it does require that the PostgreSQL
+superuser is not password protected in the database.
 
 ### DISK
 

@@ -59,7 +59,8 @@
 #                    Checks that pg_dumpall exists
 #   V1.6   07.09.16  Runs database backups before file backups so you
 #                    can follow a database backup by a remote backup
-#                    of the resulting file
+#                    of the resulting file. Adds PGSUPERUSER and PGNOSU
+#                    options.
 #
 #*************************************************************************
 # Add the path of the executable to the library path
@@ -87,7 +88,10 @@ use constant SOURCE      => "Source";
 use constant DELETE      => "--delete --delete-excluded";
 
 # Global variables
-$::pgdump = "pg_dumpall";
+$::pgdump      = "pg_dumpall";
+$::pgsuperuser = "postgres";
+$::pgsuperpass = "";            # Currently unused
+$::pgnosu      = 0;
 
 # Configuration and options
 my $configFile = SetConfigFile($FindBin::Bin, @ARGV);
@@ -140,7 +144,7 @@ sub UsageDie
     {
         print <<__EOF;
 
-Backup V1.5 (c) 2016 Dr. Andrew C.R. Martin, UCL
+Backup V1.6 (c) 2016 Dr. Andrew C.R. Martin, UCL
 
 Usage: backup [-h[=config]][-n][-nr][-q][-v][-create][-init][-c]
               [-nodelete][-delete]     [backup.conf]
@@ -210,6 +214,9 @@ Example config file...
 OPTIONS
 EXCLUDE **/*~                         # Exclude anything that ends in a ~
 PGDUMP  /usr/local/bin/pg_dumpall     # Full specification for pg_dumpall
+PGSUPERUSER postgres                  # Specify PostgreSQL superuser
+PGNOSU                                # Do dump without becoming the 
+                                      # PostgreSQL superuser
 
 # Backup /home/
 DISK   /home
@@ -374,8 +381,24 @@ sub RunDatabaseBackup
         if(CheckExists($destination, 1, IS_DIR, $::create, 
                        VERBOSE, DESTINATION))
         {
-            my $exe = "su - postgres -c \"$::pgdump --port=$port --host=$host >$destination.tmp\"";
-#           my $exe = "$::pgdump --user=postgres --port=$port --host=$host >$destination.tmp";
+            my $exe = '';
+
+# Not implemented yet as pg_dumpall does not allow password to be specified
+# on the command line!
+#            my $pw  = '';
+#            if($::pgsuperpass ne '')
+#            {
+#                $pw = " --passwd=$::pgsuperpass"
+#            }
+
+            if($::pgnosu)
+            {
+                $exe = "$::pgdump --user=$::pgsuperuser --port=$port --host=$host >$destination.tmp";
+            }
+            else
+            {
+                $exe = "su - $::pgsuperuser -c \"$::pgdump --port=$port --host=$host >$destination.tmp\"";
+            }
             RunExe($exe);
             $exe = "mv -f $destination.tmp $destination";
             RunExe($exe);
@@ -680,6 +703,20 @@ sub ReadConf
                 {
                     $::pgdump = $1;
                 }
+                elsif($options && /^PGSUPERUSER\s+(.*)/)
+                {
+                    $::pgsuperuser = $1;
+                }
+                elsif($options && /^PGNOSU/)
+                {
+                    $::pgnosu = 1;
+                }
+# Not implemented yet as pg_dumpall does not allow password to be specified
+# on the command line!
+#                elsif($options && /^PGSUPERPASS\s+(.*)/)
+#                {
+#                    $::pgsuperpass = $1;
+#                }
             }
         }
     }
