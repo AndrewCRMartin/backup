@@ -4,8 +4,8 @@
 #   Program:    backup
 #   File:       backup.pl
 #   
-#   Version:    V1.5
-#   Date:       06.09.16
+#   Version:    V1.6
+#   Date:       07.09.16
 #   Function:   Flexible backup script
 #   
 #   Copyright:  (c) Dr. Andrew C. R. Martin, UCL, 2016
@@ -57,6 +57,9 @@
 #   V1.4   05.09.16  Added --delete-excluded to rsync delete options
 #   V1.5   06.09.16  Allows host:port for database specification
 #                    Checks that pg_dumpall exists
+#   V1.6   07.09.16  Runs database backups before file backups so you
+#                    can follow a database backup by a remote backup
+#                    of the resulting file
 #
 #*************************************************************************
 # Add the path of the executable to the library path
@@ -107,9 +110,9 @@ elsif(defined($::c))
 }
 else
 {
+    my $databaseBackupErrors = BackupDatabases($hDatabases);
     my $diskBackupErrors     = BackupDisks($hDisks, $hExclude, 
                                            $backupOptions, $doDelete);
-    my $databaseBackupErrors = BackupDatabases($hDatabases);
 
     if($diskBackupErrors)
     {
