@@ -79,27 +79,19 @@ The pattern syntax is as used by `rsync`.
 2. `PGDUMP` is used to specify the location of the PostgreSQL
 `pg_dumpall` program. e.g.
 
-```
-   PGDUMP /usr/local/bin/pg_dumpall
-```
-
+        PGDUMP /usr/local/bin/pg_dumpall
 If not specified, it is assumed that `pg_dumpall` is available in the
 standard path.
 
 3. `PGSUPERUSER` is used to specify the PostgreSQL superuser. This
 defaults to `postgres`. e.g.
 
-```
-   PGSUPERUSER johnsmith
-```
+        PGSUPERUSER johnsmith
 
 4. `PGNOSU` is used to change the way that the `pg_dumpall` program is
 run. e.g.
 
-```
-   PGNOSU
-```
-
+        PGNOSU
 By default, the script uses the `su` command to become the PostgreSQL
 superuser. This means that the script must be run as root (since
 otherwise a password would be needed to change user). It also means
