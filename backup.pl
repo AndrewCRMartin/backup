@@ -4,8 +4,8 @@
 #   Program:    backup
 #   File:       backup.pl
 #   
-#   Version:    V1.6
-#   Date:       07.09.16
+#   Version:    V1.7
+#   Date:       16.09.16
 #   Function:   Flexible backup script
 #   
 #   Copyright:  (c) Dr. Andrew C. R. Martin, UCL, 2016
@@ -61,6 +61,8 @@
 #                    can follow a database backup by a remote backup
 #                    of the resulting file. Adds PGSUPERUSER and PGNOSU
 #                    options.
+#   V1.7   16.09.16  Added check that it's not a remote directory when
+#                    creating the datestamp after a backup
 #
 #*************************************************************************
 # Add the path of the executable to the library path
@@ -144,7 +146,7 @@ sub UsageDie
     {
         print <<__EOF;
 
-Backup V1.6 (c) 2016 Dr. Andrew C.R. Martin, UCL
+Backup V1.7 (c) 2016 Dr. Andrew C.R. Martin, UCL
 
 Usage: backup [-h[=config]][-n][-nr][-q][-v][-create][-init][-c]
               [-nodelete][-delete]     [backup.conf]
@@ -456,6 +458,8 @@ sub BackupDisks
 # been inmounted).
 #
 # 12.08.16  Original   By: ACRM
+# 16.09.16  Added check that destination dir is not remote before doing
+#           date stamp
 sub RunDiskBackup
 {
     my($source,$aExcludes,$aDestinations,$backupOptions,$doDelete) = @_;
@@ -491,8 +495,11 @@ sub RunDiskBackup
 
                         # Touch the runbackup file on the destination so we can check when a 
                         # backup was last run.
-                        $exe = "date > $destination/.runbackup";
-                        RunExe("$exe");
+                        if(!IsRemoteDir($destination))    # 16.09.16 added this check
+                        {
+                            $exe = "date > $destination/.runbackup";
+                            RunExe("$exe");
+                        }
                     }
                     else
                     {
@@ -555,14 +562,14 @@ sub RunExe
 # at parents of the specified file/directory.
 #
 # 12.08.16  Original   By: ACRM
+# 16.09.16  Refactored IsRemoteDir()
 sub CheckExists
 {
     my($dir, $parent, $isdir, $create, $verbose, $type) = @_;
 
     if($type eq DESTINATION)
     {
-        if((!($dir =~ /^\//)) && # It's not a local path
-           ($dir =~ /\@.*:\//))  # It does have a x@y:/ remote path
+        if(IsRemoteDir($dir))
         {
             return(1);
         }
@@ -793,4 +800,22 @@ sub PrintLastBackups
     }
 }
 
+#*************************************************************************
+# BOOL IsRemoteDir($dir)
+# ----------------------
+# Checks if a (destination) directory is remote (i.e. rsync or ssh).
+# Does this by checking the path does not start with a / and contains
+# "xxx@xxxx:xxxx" (which will also match the :: of rsync)
+#
+# 16.09.16  Refactored from CheckExists()
+sub IsRemoteDir
+{
+    my($dir) = @_;
+    if((!($dir =~ /^\//)) && # It's not a local path
+       ($dir =~ /\@.*:\//))  # It does have a x@y:/ remote path
+    {
+        return(1);
+    }
 
+    return(0);
+}
