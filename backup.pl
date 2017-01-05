@@ -4,11 +4,11 @@
 #   Program:    backup
 #   File:       backup.pl
 #   
-#   Version:    V1.7
-#   Date:       16.09.16
+#   Version:    V1.8
+#   Date:       05.01.17
 #   Function:   Flexible backup script
 #   
-#   Copyright:  (c) Dr. Andrew C. R. Martin, UCL, 2016
+#   Copyright:  (c) Dr. Andrew C. R. Martin, UCL, 2016-2017
 #   Author:     Dr. Andrew C. R. Martin
 #   Address:    Institute of Structural and Molecular Biology
 #               Division of Biosciences
@@ -63,6 +63,7 @@
 #                    options.
 #   V1.7   16.09.16  Added check that it's not a remote directory when
 #                    creating the datestamp after a backup
+#   V1.8   05.01.17  Full support for rsync daemon remote hosts
 #
 #*************************************************************************
 # Add the path of the executable to the library path
@@ -138,6 +139,7 @@ else
 #
 # 12.08.16  Original   By: ACRM
 # 30.08.16  Added -h=config parameter
+# 05.01.17  Updated for full rsync daemon support
 sub UsageDie
 {
     my($example) = @_;
@@ -146,7 +148,7 @@ sub UsageDie
     {
         print <<__EOF;
 
-Backup V1.7 (c) 2016 Dr. Andrew C.R. Martin, UCL
+Backup V1.8 (c) 2016-2017 Dr. Andrew C.R. Martin, UCL
 
 Usage: backup [-h[=config]][-n][-nr][-q][-v][-create][-init][-c]
               [-nodelete][-delete]     [backup.conf]
@@ -204,6 +206,10 @@ set this to something else.
 NOTE!! For database backups, the destination directory must be 
 writeable by the 'postgres' super-user.
 
+NOTE!! If you are performing backups to a remote rsync daemon instead
+of simply over ssh, then only one remote server password may currently
+be specified.
+
 __EOF
     }
     else
@@ -219,6 +225,7 @@ PGDUMP  /usr/local/bin/pg_dumpall     # Full specification for pg_dumpall
 PGSUPERUSER postgres                  # Specify PostgreSQL superuser
 PGNOSU                                # Do dump without becoming the 
                                       # PostgreSQL superuser
+RSYNCPW rsync                         # Password for using rsync daemon
 
 # Backup /home/
 DISK   /home
@@ -229,6 +236,8 @@ BACKUP /nas/backup/home
 DISK    /data
 BACKUP  /nas/backup/data              # Backup locally
 BACKUP  user@remotehost:/backup/data  # Backup over ssh
+BACKUP  user@remotehost::backup/data  # Backup over rsync daemon
+                                      # (Note no / after :: Password from RSYNCPW)
 EXCLUDE tmp/                          # Exclude any tmp directories
 
 # Backup PostgreSQL database on the local host on port 5432
@@ -247,6 +256,8 @@ __EOF
 # Checks the config data is valid - i.e. all destinations are full paths
 #
 # 12.08.16  Original   By: ACRM
+# 05.01.17  Updated for full rsync daemon support. Now checks for remotes
+#           with :: (rsync daemon) and then with : (ssh)
 sub CheckConfigAndDieOnError
 {
     my (@configHashes) = @_;
@@ -258,17 +269,39 @@ sub CheckConfigAndDieOnError
             my @destinations = @{$$hConfigHash{$source}};
             foreach my $destination (@destinations)
             {
-                if(!($destination =~ /^\//))
+                if(!($destination =~ /^\//))      # Destination does not start with a / 
                 {
-                    if($destination =~ /^(.*)\//)
-                    {
-                        my $host = $1;
-                        if(!($host =~ /.*\@.*\//))
-                        {
-                            print STDERR "\n*** BACKUP CONFIG ERROR - all destination paths must start with a / ***\n\n";
+		    if($destination =~ /^(.*)::(.*)/) # rsync daemon
+		    {
+			my $host = $1;
+			my $path = $2;
+			if((!($host =~ /.*\@.*/)) || ($path =~ /^\//))
+			{
+                            print STDERR "\n*** BACKUP CONFIG ERROR - rsync daemon host must be specified as ***\n";
+			    print STDERR "*** user\@host::path (note no / before the path)                  ***\n\n";
                             exit 1;
-                        }
-                    }
+			}
+		    }
+		    elsif($destination =~ /^(.*):(.*)/) # ssh
+		    {
+			my $host = $1;
+			my $path = $2;
+			if((!($host =~ /.*\@.*/)) || (!($path =~ /^\//)))
+			{
+                            print STDERR "\n*** BACKUP CONFIG ERROR - ssh host must be specified as ***\n";
+			    print STDERR "*** user\@host:/path (note the / before the path)        ***\n\n";
+                            exit 1;
+			}
+		    }
+#                    elsif($destination =~ /^(.*)\//)
+#                    {
+#                        my $host = $1;
+#                        if(!($host =~ /.*\@.*\//))
+#                        {
+#                            print STDERR "\n*** BACKUP CONFIG ERROR - all destination paths must start with a / ***\n\n";
+#                            exit 1;
+#                        }
+#                    }
                     else
                     {
                         print STDERR "\n*** BACKUP CONFIG ERROR - all destination paths must start with a / ***\n\n";
@@ -646,6 +679,7 @@ sub SetDeleteIfSunday
 # Read the configuration file
 #
 # 12.08.16  Original   By: ACRM
+# 05.01.17  Added RSYNCPW as a global option
 sub ReadConf
 {
     my($confFile) = @_;
@@ -705,6 +739,10 @@ sub ReadConf
                     {
                         push(@{$exclude{'ALL'}}, $1);
                     }
+                }
+                elsif(/^RSYNCPW\s+(.*)/)
+                {
+		    $ENV{'RSYNC_PASSWORD'} = $1;
                 }
                 elsif($options && /^PGDUMP\s+(.*)/)
                 {
@@ -808,11 +846,12 @@ sub PrintLastBackups
 # "xxx@xxxx:xxxx" (which will also match the :: of rsync)
 #
 # 16.09.16  Refactored from CheckExists()
+# 05.01.17  Checks fro x@y: instead of x@y:/
 sub IsRemoteDir
 {
     my($dir) = @_;
     if((!($dir =~ /^\//)) && # It's not a local path
-       ($dir =~ /\@.*:\//))  # It does have a x@y:/ remote path
+       ($dir =~ /\@.*:/))  # It does have a x@y: remote path
     {
         return(1);
     }

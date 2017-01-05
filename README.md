@@ -64,8 +64,8 @@ The configuration file has three sections:
 
 ### OPTIONS
 
-The `OPTIONS` section defines global settings. Currently four settings
-are supported:
+The `OPTIONS` section defines global settings. Currently the following
+settings are supported:
 
 1. `EXCLUDE` is used to define patterns for files that should be
 excluded from all backups. Typically this might be used to exclude
@@ -105,6 +105,15 @@ by root or that the destination directory is writable by the
 PostgreSQL superuser. However it does require that the PostgreSQL
 superuser is not password protected in the database.
 
+5. `RSYNCPW` is used to set a password for a remote rsync daemon. This
+is only used if you are doing backups to a remote rsync daemon rather
+than local disks or to a remote server over ssh. Currently only one
+password may be specified and consequently you would normally be
+backing up to a single remote rsync daemon server. e.g.
+
+        RSYNCPW rsync
+
+
 ### DISK
 
 The `DISK` section is the main section specifying directories to be
@@ -119,13 +128,22 @@ followed by the destination to which the files should be sent.
 ```
    DISK /data
    BACKUP /nas/backup/data
-   BACKUP user@remotehost:/backup/data
+   BACKUP user@remotehost1:/backup/data
+   BACKUP user@remotehost2::backup/data
 ```
 
-This specifies that the directory `/data` should be backed up to two
-locations: the locally mounted folder `/nas/backup/data` and via SSH
-to `/backup/data` as the specified user on the specified remote
-machine.
+This specifies that the directory `/data` should be backed up to three
+locations: 
+
+1. the locally mounted folder `/nas/backup/data`
+
+2. via SSH to `/backup/data` as the specified user on the specified remote
+machine. Note the single colon followed by a slash (`:/`).
+
+3. via the RSYNC DAEMON to `backup/data` as the specified user on the
+specified remote machine. Note the double colon followed by NO slash
+(`::`). This is a 'short directory' name as specified in the rsync
+daemon configuration file on the remote host.
 
 Optionally, one or more `EXCLUDE` commands may be used to exclude
 patterns from the backup. This works in the same way as the `EXCLUDE`
