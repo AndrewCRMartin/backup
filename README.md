@@ -23,7 +23,7 @@ access to all databases.
 Program Installation
 --------------------
 
-To install the program in your local directory, simply type
+To install the program in your local directory, simply type:
 
 ```
    ./install.sh
@@ -36,17 +36,25 @@ This can be overridden by specifying the script directory followed
 (optionally) by the binary directory on the command line.
 
 For example, to install the script in `/usr/local/apps/backup` and a
-link in `/usr/local/bin`, you would do
+link in `/usr/local/bin`, you would do:
 
 ```
    ./install.sh /usr/local/apps/backup  /usr/local/bin
 ```
 
 If you want to keep the script in the directory where you unpacked
-the program, then just do
+the program, then just do:
 
 ```
    ./install.sh .  /usr/local/bin
+```
+
+A utility script has also been provided if you have `sudo` permissions
+to install in your home scripts and bin directories and to install
+system wide in `/usr/local/sbin`:
+
+```
+   ./home_and_system_install.sh
 ```
 
 

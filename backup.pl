@@ -322,6 +322,7 @@ sub CheckConfigAndDieOnError
 # each directory.
 #
 # 12.08.16  Original   By: ACRM
+# 06.01.17  Added check on remote dir before touch
 sub InitBackupDirs
 {
     my ($hDisks) = @_;
@@ -350,8 +351,11 @@ sub InitBackupDirs
             CheckExists($theDestination, 0, IS_DIR, CREATE, 
                         VERBOSE, DESTINATION);
 
-            $theDestination .= ".runbackup"; 
-            RunExe("touch $theDestination");
+            if(!IsRemoteDir($theDestination)) # 06.01.17
+            {
+                $theDestination .= ".runbackup"; 
+                RunExe("touch $theDestination");
+            }
         }
     }
 }
