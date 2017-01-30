@@ -4,8 +4,8 @@
 #   Program:    backup
 #   File:       backup.pl
 #   
-#   Version:    V1.8
-#   Date:       05.01.17
+#   Version:    V1.9
+#   Date:       30.01.17
 #   Function:   Flexible backup script
 #   
 #   Copyright:  (c) Dr. Andrew C. R. Martin, UCL, 2016-2017
@@ -64,6 +64,8 @@
 #   V1.7   16.09.16  Added check that it's not a remote directory when
 #                    creating the datestamp after a backup
 #   V1.8   05.01.17  Full support for rsync daemon remote hosts
+#   V1.9   30.01.17  Added check on remote directories when printing
+#                    date of last backup
 #
 #*************************************************************************
 # Add the path of the executable to the library path
@@ -148,7 +150,7 @@ sub UsageDie
     {
         print <<__EOF;
 
-Backup V1.8 (c) 2016-2017 Dr. Andrew C.R. Martin, UCL
+Backup V1.9 (c) 2016-2017 Dr. Andrew C.R. Martin, UCL
 
 Usage: backup [-h[=config]][-n][-nr][-q][-v][-create][-init][-c]
               [-nodelete][-delete]     [backup.conf]
@@ -823,6 +825,7 @@ sub SetConfigFile
 # files in the destination directories.
 #
 # 12.08.16  Original   By: ACRM
+# 30.01.17  Added check on remote backups
 sub PrintLastBackups
 {
     my ($hDisks) = @_;
@@ -836,7 +839,14 @@ sub PrintLastBackups
             $theDestination .= "/" if(!($theDestination =~ /\/$/));
             $theDestination .= ".runbackup"; 
             print "$source -> $destination\n   ";
-            RunExe("cat $theDestination");
+            if(IsRemoteDir($destination))
+            {
+                print "(Remote directory)\n";
+            }
+            else
+            {
+                RunExe("cat $theDestination");
+            }
             print "\n";
         }
     }
