@@ -4,11 +4,11 @@
 #   Program:    backup
 #   File:       backup.pl
 #   
-#   Version:    V1.9
-#   Date:       30.01.17
+#   Version:    V1.10
+#   Date:       22.02.18
 #   Function:   Flexible backup script
 #   
-#   Copyright:  (c) Dr. Andrew C. R. Martin, UCL, 2016-2017
+#   Copyright:  (c) Dr. Andrew C. R. Martin, UCL, 2016-2018
 #   Author:     Dr. Andrew C. R. Martin
 #   Address:    Institute of Structural and Molecular Biology
 #               Division of Biosciences
@@ -66,6 +66,7 @@
 #   V1.8   05.01.17  Full support for rsync daemon remote hosts
 #   V1.9   30.01.17  Added check on remote directories when printing
 #                    date of last backup
+#   V1.10  22.02.18  Added -only option
 #
 #*************************************************************************
 # Add the path of the executable to the library path
@@ -119,9 +120,17 @@ elsif(defined($::c))
 }
 else
 {
-    my $databaseBackupErrors = BackupDatabases($hDatabases);
-    my $diskBackupErrors     = BackupDisks($hDisks, $hExclude, 
-                                           $backupOptions, $doDelete);
+    my $databaseBackupErrors = 0;
+    my $diskBackupErrors     = 0;
+    my $onlyDisks            = defined($::only)?$::only:'';
+
+    if(!defined($::only))
+    {
+        $databaseBackupErrors = BackupDatabases($hDatabases);
+    }
+    $diskBackupErrors     = BackupDisks($hDisks, $hExclude, 
+                                        $backupOptions, $doDelete, 
+                                        $onlyDisks);
 
     if($diskBackupErrors)
     {
@@ -142,6 +151,7 @@ else
 # 12.08.16  Original   By: ACRM
 # 30.08.16  Added -h=config parameter
 # 05.01.17  Updated for full rsync daemon support
+# 22.02.18  Updated for -only option
 sub UsageDie
 {
     my($example) = @_;
@@ -150,10 +160,10 @@ sub UsageDie
     {
         print <<__EOF;
 
-Backup V1.9 (c) 2016-2017 Dr. Andrew C.R. Martin, UCL
+Backup V1.10 (c) 2016-2018 Dr. Andrew C.R. Martin, UCL
 
 Usage: backup [-h[=config]][-n][-nr][-q][-v][-create][-init][-c]
-              [-nodelete][-delete]     [backup.conf]
+              [-nodelete][-delete][-only=xxx[:xxx[...]]]  [backup.conf]
        -h        This help message
        -h=config Give details of config file
        -n        Pretend to do the backup
@@ -170,6 +180,8 @@ Usage: backup [-h[=config]][-n][-nr][-q][-v][-create][-init][-c]
        -nodelete Prevent deletion of files on the backup if they have
                  gone away in the source directory even if it is 
                  Sunday. (Takes precedent over -delete)
+       -only     Only backup DISKs specified in the colon-separated
+                 list
                
 
 Backup is a flexible backup program for performing backups using
@@ -454,39 +466,78 @@ sub RunDatabaseBackup
 
 
 #*************************************************************************
-# $totalErrors=BackupDisks($hDisks, $hExclude, $backupOptions, $doDelete)
+# $totalErrors=BackupDisks($hDisks, $hExclude, $backupOptions, $doDelete,
+#                          $onlyDisks)
 # -----------------------------------------------------------------------
 # Run all disk backups
+# $onlyDisks is a : separated list of 'DISK's to be backed up
 #
 # 12.08.16  Original   By: ACRM
+# 22.02.18  Added $onlyDisks option
 sub BackupDisks
 {
-    my($hDisks, $hExclude, $backupOptions, $doDelete) = @_;
+    my($hDisks, $hExclude, $backupOptions, $doDelete, $onlyDisks) = @_;
     my $totalErrors = 0;
 
     foreach my $source (keys %$hDisks)
     {
-        my $errors;
-        my @excludes = ();
-        if(defined($$hExclude{$source}))
+        if(($onlyDisks eq '') || InDiskList($onlyDisks, $source))
         {
-            push @excludes, @{$$hExclude{$source}};
-        }
-        if(defined($$hExclude{'ALL'}))
-        {
-            push @excludes, @{$$hExclude{'ALL'}};
-        }
+            my $errors;
+            my @excludes = ();
+            if(defined($$hExclude{$source}))
+            {
+                push @excludes, @{$$hExclude{$source}};
+            }
+            if(defined($$hExclude{'ALL'}))
+            {
+                push @excludes, @{$$hExclude{'ALL'}};
+            }
 
-        $errors = RunDiskBackup($source, 
-                                \@excludes,
-                                $$hDisks{$source}, 
-                                $backupOptions, $doDelete);
-        $totalErrors += $errors;
+            $errors = RunDiskBackup($source, 
+                                    \@excludes,
+                                    $$hDisks{$source}, 
+                                    $backupOptions, $doDelete);
+            $totalErrors += $errors;
+        }
+        else
+        {
+            print STDERR ">>> SKIPPING $source\n";
+        }
     }
 
     return($totalErrors);
 }
 
+
+#*************************************************************************
+# $ok = InDiskList($diskList, $disk)
+# ----------------------------------
+# Determines whether $disk appears in the colon-separated list $diskList
+#
+# 22.02.18 Original   By: ACRM
+sub InDiskList
+{
+    my($diskList, $disk) = @_;
+
+    # Add trailing / to disk name if there isn't one
+    if(!($disk =~ /\/$/))
+    {
+        $disk .= "/";
+    }
+
+    my @diskListArray = split(/:/, $diskList);
+    foreach my $listedDisk (@diskListArray)
+    {
+        # Add trailing / to listed disk name if there isn't one
+        if(!($listedDisk =~ /\/$/))
+        {
+            $listedDisk .= "/";
+        }
+        return(1) if($disk eq $listedDisk);
+    }
+    return(0);
+}
 
 #*************************************************************************
 # $errors = RunDiskBackup($source, $aExcludes, $aDestinations,
