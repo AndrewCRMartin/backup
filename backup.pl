@@ -4,8 +4,8 @@
 #   Program:    backup
 #   File:       backup.pl
 #   
-#   Version:    V1.10
-#   Date:       22.02.18
+#   Version:    V1.11
+#   Date:       26.08.18
 #   Function:   Flexible backup script
 #   
 #   Copyright:  (c) Dr. Andrew C. R. Martin, UCL, 2016-2018
@@ -67,6 +67,7 @@
 #   V1.9   30.01.17  Added check on remote directories when printing
 #                    date of last backup
 #   V1.10  22.02.18  Added -only option
+#   V1.11  26.08.18  Added NODELETE config option
 #
 #*************************************************************************
 # Add the path of the executable to the library path
@@ -101,7 +102,7 @@ $::pgnosu      = 0;
 
 # Configuration and options
 my $configFile = SetConfigFile($FindBin::Bin, @ARGV);
-my ($hDisks, $hExclude, $hDatabases) = ReadConf($configFile);
+my ($hDisks, $hExclude, $hDatabases, $hNodelete) = ReadConf($configFile);
 my $backupOptions = "-a --exclude=lost+found";
 my $doDelete      = SetDeleteIfSunday();
 $backupOptions   .= " -v" if(!defined($::q) && !defined($::qr));
@@ -128,9 +129,9 @@ else
     {
         $databaseBackupErrors = BackupDatabases($hDatabases);
     }
-    $diskBackupErrors     = BackupDisks($hDisks, $hExclude, 
-                                        $backupOptions, $doDelete, 
-                                        $onlyDisks);
+    $diskBackupErrors = BackupDisks($hDisks, $hExclude, $hNodelete,
+                                    $backupOptions, $doDelete, 
+                                    $onlyDisks);
 
     if($diskBackupErrors)
     {
@@ -152,6 +153,7 @@ else
 # 30.08.16  Added -h=config parameter
 # 05.01.17  Updated for full rsync daemon support
 # 22.02.18  Updated for -only option
+# 26.08.18  Added NODELETE config option
 sub UsageDie
 {
     my($example) = @_;
@@ -194,7 +196,8 @@ more files to dump the backup to.
 
 By default the program only deletes files on the backup if they have
 gone away in the source directory if the program is run on a Sunday.
-The -delete/-nodelete options override this.
+The -delete/-nodelete options override this. A NODELETE for a backup
+in the config file is never overridden.
 
 The configuration file may be specified on the command line. If not,
 then the program will look for 'backup.conf' in the current directory
@@ -244,7 +247,7 @@ RSYNCPW rsync                         # Password for using rsync daemon
 # Backup /home/
 DISK   /home
 BACKUP /localbackup/home
-BACKUP /nas/backup/home
+BACKUP /nas/backup/home NODELETE      # Backup, but never delete files
 
 # Backup /data/
 DISK    /data
@@ -466,17 +469,20 @@ sub RunDatabaseBackup
 
 
 #*************************************************************************
-# $totalErrors=BackupDisks($hDisks, $hExclude, $backupOptions, $doDelete,
-#                          $onlyDisks)
+# $totalErrors=BackupDisks($hDisks, $hExclude, $hNodelete, $backupOptions,
+#                          $doDelete, $onlyDisks)
 # -----------------------------------------------------------------------
 # Run all disk backups
 # $onlyDisks is a : separated list of 'DISK's to be backed up
 #
 # 12.08.16  Original   By: ACRM
 # 22.02.18  Added $onlyDisks option
+# 26.08.18  Added NODELETE config option
 sub BackupDisks
 {
-    my($hDisks, $hExclude, $backupOptions, $doDelete, $onlyDisks) = @_;
+    my($hDisks, $hExclude, $hNodelete, $backupOptions, 
+       $doDelete, $onlyDisks) = @_;
+
     my $totalErrors = 0;
 
     foreach my $source (keys %$hDisks)
@@ -497,6 +503,7 @@ sub BackupDisks
             $errors = RunDiskBackup($source, 
                                     \@excludes,
                                     $$hDisks{$source}, 
+                                    $hNodelete,
                                     $backupOptions, $doDelete);
             $totalErrors += $errors;
         }
@@ -541,7 +548,7 @@ sub InDiskList
 
 #*************************************************************************
 # $errors = RunDiskBackup($source, $aExcludes, $aDestinations,
-#                         $backupOptions, $doDelete)
+#                         $hNodelete, $backupOptions, $doDelete)
 # ------------------------------------------------------------
 # Run the backup of a disk. Checks the source and destination exist
 # and contain the .runbackup file (used to ensure the directory hasn't
@@ -550,9 +557,11 @@ sub InDiskList
 # 12.08.16  Original   By: ACRM
 # 16.09.16  Added check that destination dir is not remote before doing
 #           date stamp
+# 26.08.18  Added NODELETE config option
 sub RunDiskBackup
 {
-    my($source,$aExcludes,$aDestinations,$backupOptions,$doDelete) = @_;
+    my($source, $aExcludes, $aDestinations, $hNodelete,
+       $backupOptions, $doDelete) = @_;
     my $errors = 0;
 
     # Add / to end of source if missing
@@ -579,8 +588,12 @@ sub RunDiskBackup
                     if(CheckExists($theDestination.".runbackup", 0, IS_FILE, $::create, 
                                    QUIET, DESTINATION))
                     {
+                        my $id = $source . '|' . $destination;
+                        my $rsyncDelete = $doDelete;
+                        $rsyncDelete = '' if($$hNodelete{$id});
+
                         print STDERR ">>> Backing up $source to $destination\n" if(!defined($::q));
-                        my $exe = "rsync $backupOptions $doDelete $exclude $source $destination";
+                        my $exe = "rsync $backupOptions $rsyncDelete $exclude $source $destination";
                         RunExe("$exe");
 
                         # Touch the runbackup file on the destination so we can check when a 
@@ -593,7 +606,7 @@ sub RunDiskBackup
                     }
                     else
                     {
-                        print STDERR "*** INFO: Backup skipped since .runbackup file doesn't exist in $destination\n";
+                        print STDERR "*** INFO: Backup '$source > $destination' skipped since .runbackup file doesn't exist in destination\n";
                     }
                 }
                 else
@@ -604,7 +617,7 @@ sub RunDiskBackup
         }
         else
         {
-            print STDERR "*** INFO: Backup skipped since .runbackup file doesn't exist in $source\n";
+            print STDERR "*** INFO: Backup of '$source' skipped since .runbackup file doesn't exist in source\n";
         }
     }
 
@@ -737,6 +750,7 @@ sub SetDeleteIfSunday
 #
 # 12.08.16  Original   By: ACRM
 # 05.01.17  Added RSYNCPW as a global option
+# 26.08.18  Added NODELETE as a by-backup option
 sub ReadConf
 {
     my($confFile) = @_;
@@ -747,6 +761,7 @@ sub ReadConf
     my %disks     = ();
     my %exclude   = ();
     my %databases = ();
+    my %nodelete  = ();
 
     if(open(my $fp, '<', $confFile))
     {
@@ -775,15 +790,36 @@ sub ReadConf
                     $db      = '';
                     $options = 1;
                 }
-                elsif(/^BACKUP\s+(.*)/)
+                elsif(/^BACKUP\s+(.*)\s+NODEL/)
                 {
+                    my $destination = $1;
+
                     if($source ne '')
                     {
-                        push(@{$disks{$source}}, $1);
+                        push(@{$disks{$source}}, $destination);
+                        my $id = $source;
+                        if(!($id =~ /\/$/))
+                        {
+                            $id .= "/";
+                        }
+
+                        $id .= '|' . $destination;
+                        $nodelete{$id} = 1;
+                    }
+                }
+                elsif(/^BACKUP\s+(.*)/)
+                {
+                    my $destination = $1;
+
+                    if($source ne '')
+                    {
+                        push(@{$disks{$source}}, $destination);
+                        my $id = $source . '|' . $destination;
+                        $nodelete{$id} = 0;
                     }
                     elsif($db ne '')
                     {
-                        push(@{$databases{$db}}, $1);
+                        push(@{$databases{$db}}, $destination);
                     }
                 }
                 elsif(/^EXCLUDE\s+(.*)/)
@@ -828,7 +864,7 @@ sub ReadConf
         exit 1;
     }
 
-    return(\%disks, \%exclude, \%databases);
+    return(\%disks, \%exclude, \%databases, \%nodelete);
 }
 
 

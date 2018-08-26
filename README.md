@@ -1,7 +1,7 @@
 backup
 ======
 
-(c) 2016 UCL, Dr. Andrew C.R. Martin
+(c) 2016-2018 UCL, Dr. Andrew C.R. Martin
 
 A flexible backup script for Unix/Linux systems driven by a
 configuration file. Allows backups from a directory to another
@@ -135,7 +135,7 @@ followed by the destination to which the files should be sent.
 
 ```
    DISK /data
-   BACKUP /nas/backup/data
+   BACKUP /nas/backup/data NODELETE
    BACKUP user@remotehost1:/backup/data
    BACKUP user@remotehost2::backup/data
 ```
@@ -143,7 +143,8 @@ followed by the destination to which the files should be sent.
 This specifies that the directory `/data` should be backed up to three
 locations: 
 
-1. the locally mounted folder `/nas/backup/data`
+1. the locally mounted folder `/nas/backup/data`. Backed up files are 
+never deleted even if they have gone away from the source directory.
 
 2. via SSH to `/backup/data` as the specified user on the specified remote
 machine. Note the single colon followed by a slash (`:/`).
@@ -206,7 +207,7 @@ backup to a remote host.
    # Backup /home/
    DISK   /home
    BACKUP /localbackup/home
-   BACKUP /nas/backup/home
+   BACKUP /nas/backup/home NODELETE      # Never delete files in this backup
    
    # Backup /data/
    DISK    /data
